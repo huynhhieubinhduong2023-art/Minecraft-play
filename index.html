@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudCraft Play - Chơi Minecraft Bedrock từ xa</title>
+<style>
+  :root {
+    --bg-dark: #0d1117;
+    --bg-panel: #161b22;
+    --bg-panel-2: #1c2128;
+    --green: #3fb950;
+    --green-dark: #2ea043;
+    --green-glow: #56d364;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --red: #f85149;
+    --yellow: #d29922;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      linear-gradient(rgba(13,17,23,0.92), rgba(13,17,23,0.92)),
+      repeating-linear-gradient(0deg, #1a1f26 0, #1a1f26 1px, transparent 1px, transparent 24px),
+      repeating-linear-gradient(90deg, #1a1f26 0, #1a1f26 1px, transparent 1px, transparent 24px);
+    padding: 16px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; padding: 14px 18px;
+    background: var(--bg-panel); border: 2px solid var(--border);
+    border-radius: 4px; margin-bottom: 16px;
+    box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #21262d;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon { width: 48px; height: 48px; flex-shrink: 0; }
+  .logo-text h1 {
+    font-size: 1.35rem; color: var(--green-glow); letter-spacing: 1px;
+    text-shadow: 2px 2px 0 #000; font-family: 'Courier New', monospace; font-weight: 900;
+  }
+  .logo-text p { font-size: 0.72rem; color: var(--text-dim); }
+  .header-status {
+    display: flex; align-items: center; gap: 8px; font-size: 0.85rem;
+    padding: 6px 12px; background: var(--bg-panel-2);
+    border: 1px solid var(--border); border-radius: 4px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; }
+  .dot.connected { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.5s infinite; }
+  .dot.connecting { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); animation: pulse 0.6s infinite; }
+  .dot.disconnected { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+  .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+  @media (max-width: 820px) { .main-grid { grid-template-columns: 1fr; } }
+  .screen-panel {
+    background: var(--bg-panel); border: 2px solid var(--border);
+    border-radius: 4px; overflow: hidden;
+    box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #21262d;
+  }
+  .panel-title {
+    background: var(--bg-panel-2); padding: 10px 16px; font-size: 0.85rem;
+    font-weight: bold; color: var(--green-glow); border-bottom: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: 'Courier New', monospace; letter-spacing: 1px;
+  }
+  .screen {
+    position: relative; aspect-ratio: 16/9; background: #000;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .screen::after {
+    content: ""; position: absolute; inset: 0;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+    pointer-events: none; opacity: 0.4;
+  }
+  .screen-placeholder { text-align: center; padding: 20px; z-index: 1; max-width: 90%; }
+  .screen-placeholder .icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.6; }
+  .screen-placeholder h3 { color: var(--text-dim); font-size: 1rem; margin-bottom: 6px; }
+  .screen-placeholder p { color: #6e7681; font-size: 0.8rem; line-height: 1.5; }
+  .warning-box {
+    margin-top: 14px; background: rgba(210,153,34,0.12);
+    border: 2px solid var(--yellow); border-radius: 4px;
+    padding: 10px 14px; color: #e3b341; font-size: 0.82rem;
+    display: inline-block; max-width: 100%;
+  }
+  .connecting-anim { display: none; }
+  .connecting-anim.show {
+    display: flex; flex-direction: column; align-items: center; gap: 14px; z-index: 1;
+  }
+  .spinner {
+    width: 40px; height: 40px; border: 4px solid var(--bg-panel-2);
+    border-top-color: var(--green); border-radius: 50%; animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .connecting-anim p { color: var(--yellow); font-size: 0.9rem; font-family: 'Courier New', monospace; }
+  .screen-toolbar {
+    display: flex; gap: 8px; padding: 12px; background: var(--bg-panel-2);
+    border-top: 2px solid var(--border); flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'Courier New', monospace; font-weight: bold; letter-spacing: 0.5px;
+    border: 2px solid #000; border-radius: 3px; padding: 10px 18px;
+    cursor: pointer; transition: transform 0.08s, filter 0.15s;
+    font-size: 0.85rem; position: relative;
+    box-shadow: inset -2px -2px 0 rgba(0,0,0,0.35), inset 2px 2px 0 rgba(255,255,255,0.15);
+    text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+  }
+  .btn:active:not(:disabled) { transform: translateY(2px); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; filter: grayscale(0.5); }
+  .btn-play {
+    background: var(--green); color: #052e10; flex: 1; min-width: 140px;
+    font-size: 0.95rem; padding: 12px 18px;
+  }
+  .btn-play:hover:not(:disabled) { background: var(--green-glow); }
+  .btn-stop { background: var(--red); color: #2b0000; }
+  .btn-stop:hover:not(:disabled) { filter: brightness(1.15); }
+  .btn-ghost { background: var(--bg-panel); color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover:not(:disabled) { background: #21262d; }
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+  .card {
+    background: var(--bg-panel); border: 2px solid var(--border);
+    border-radius: 4px; box-shadow: 0 0 0 1px #000, inset 0 0 0 1px #21262d; overflow: hidden;
+  }
+  .card-title {
+    background: var(--bg-panel-2); padding: 10px 14px; font-size: 0.78rem;
+    font-weight: bold; color: var(--green-glow); border-bottom: 2px solid var(--border);
+    font-family: 'Courier New', monospace; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .card-body { padding: 14px; }
+  .status-list { display: flex; flex-direction: column; gap: 8px; }
+  .status-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    background: var(--bg-panel-2); border: 1px solid var(--border);
+    border-radius: 3px; font-size: 0.8rem;
+  }
+  .status-item .label { flex: 1; color: var(--text-dim); }
+  .status-item .value { font-weight: bold; color: var(--text); font-family: 'Courier New', monospace; font-size: 0.75rem; }
+  .session-list { display: flex; flex-direction: column; gap: 8px; }
+  .session-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px;
+    background: var(--bg-panel-2); border: 2px solid var(--border);
+    border-radius: 3px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    font-size: 0.82rem; text-align: left; color: var(--text); width: 100%;
+  }
+  .session-item:hover { border-color: var(--green-dark); background: #20262e; }
+  .session-item.selected { border-color: var(--green); background: rgba(63,185,80,0.1); }
+  .session-item .s-icon { font-size: 1.1rem; }
+  .session-item .s-info { flex: 1; }
+  .session-item .s-name { font-weight: bold; color: var(--text); }
+  .session-item .s-desc { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
+  footer { text-align: center; padding: 20px 10px 10px; color: #484f58; font-size: 0.72rem; line-height: 1.6; }
+  footer .disclaimer {
+    display: inline-block; max-width: 640px; padding: 10px 16px;
+    border: 1px dashed var(--border); border-radius: 4px; margin-bottom: 10px;
+  }
+  .toast {
+    position: fixed; bottom: 20px; left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--bg-panel); border: 2px solid var(--green); color: var(--text);
+    padding: 12px 20px; border-radius: 4px; font-size: 0.85rem; z-index: 999;
+    transition: transform 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+    max-width: 90%; text-align: center;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: var(--red); }
+  .toast.warn { border-color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="logo">
+      <svg class="logo-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="16" height="16" fill="#0d1117"/>
+        <rect x="3" y="6" width="10" height="5" fill="#e6edf3"/>
+        <rect x="4" y="5" width="8" height="1" fill="#e6edf3"/>
+        <rect x="5" y="4" width="6" height="1" fill="#e6edf3"/>
+        <rect x="2" y="7" width="1" height="3" fill="#e6edf3"/>
+        <rect x="13" y="7" width="1" height="3" fill="#e6edf3"/>
+        <rect x="3" y="11" width="10" height="3" fill="#3fb950"/>
+        <rect x="3" y="11" width="10" height="1" fill="#56d364"/>
+        <rect x="3" y="13" width="10" height="1" fill="#2ea043"/>
+        <rect x="6" y="8" width="1" height="1" fill="#3fb950"/>
+        <rect x="9" y="8" width="1" height="1" fill="#3fb950"/>
+      </svg>
+      <div class="logo-text">
+        <h1>CloudCraft Play</h1>
+        <p>Minecraft Bedrock từ xa qua trình duyệt</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <span class="dot disconnected" id="headerDot"></span>
+      <span id="headerStatusText">Chưa kết nối</span>
+    </div>
+  </header>
+  <div class="main-grid">
+    <div class="screen-panel">
+      <div class="panel-title">
+        <span>🖥️ MÀN HÌNH ANDROID TỪ XA</span>
+        <span id="screenBadge" style="color:var(--text-dim);font-size:0.7rem;">OFFLINE</span>
+      </div>
+      <div class="screen" id="screen">
+        <div class="screen-placeholder" id="placeholder">
+          <div class="icon">📱</div>
+          <h3>Chưa có máy chủ giả lập được kết nối</h3>
+          <p>Đây là khu vực hiển thị màn hình Android từ xa.<br>Chọn phiên chơi và nhấn "Bắt đầu chơi" để thử.</p>
+          <div class="warning-box">
+            ⚠️ Giao diện demo – chưa có backend/máy chủ thật.<br>
+            Không có Minecraft nào đang chạy ở đây.
+          </div>
+        </div>
+        <div class="connecting-anim" id="connectingAnim">
+          <div class="spinner"></div>
+          <p>Đang kết nối tới máy chủ...</p>
+          <p style="color:var(--text-dim);font-size:0.75rem;">(Mô phỏng – sẽ thất bại vì chưa có máy chủ)</p>
+        </div>
+      </div>
+      <div class="screen-toolbar">
+        <button class="btn btn-play" id="btnPlay">▶ BẮT ĐẦU CHƠI</button>
+        <button class="btn btn-stop" id="btnStop" disabled>■ NGẮT KẾT NỐI</button>
+        <button class="btn btn-ghost" id="btnFullscreen">⛶ Toàn màn hình</button>
+      </div>
+    </div>
+    <div class="sidebar">
+      <div class="card">
+        <div class="card-title">📡 Trạng thái kết nối</div>
+        <div class="card-body">
+          <div class="status-list">
+            <div class="status-item">
+              <span class="dot disconnected" id="stDot"></span>
+              <span class="label">Kết nối</span>
+              <span class="value" id="stText">Chưa kết nối</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Máy chủ</span>
+              <span class="value" id="stServer">Không có</span>
+            </div>
+            <div class="status-item">
+              <span class="label">Phiên chơi</span>
+              <span class="value" id="stSession">Chưa chọn</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🎮 Chọn phiên chơi</div>
+        <div class="card-body">
+          <div class="session-list" id="sessionList">
+            <button class="session-item" data-id="survival" data-name="Survival">
+              <span class="s-icon">🌲</span>
+              <span class="s-info"><span class="s-name">Survival</span><span class="s-desc">Sinh tồn cơ bản</span></span>
+            </button>
+            <button class="session-item" data-id="creative" data-name="Creative">
+              <span class="s-icon">🎨</span>
+              <span class="s-info"><span class="s-name">Creative</span><span class="s-desc">Sáng tạo tự do</span></span>
+            </button>
+            <button class="session-item" data-id="minigame" data-name="Minigame">
+              <span class="s-icon">🏆</span>
+              <span class="s-info"><span class="s-name">Minigame</span><span class="s-desc">Đấu trường nhỏ</span></span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">ℹ️ Lưu ý</div>
+        <div class="card-body" style="font-size:0.78rem;color:var(--text-dim);line-height:1.6;">
+          Đây là <b style="color:var(--green-glow)">giao diện demo</b>. Chưa có máy chủ giả lập Android/backend nào được kết nối.<br><br>
+          Khi bạn nhấn "Bắt đầu chơi", hệ thống sẽ thử kết nối và báo lỗi vì chưa có máy chủ thật.
+        </div>
+      </div>
+    </div>
+  </div>
+  <footer>
+    <div class="disclaimer">
+      ⚠️ <b>CloudCraft Play</b> chỉ là giao diện minh họa. Không có máy chủ giả lập nào được kết nối.
+      Không có phiên Minecraft Bedrock thật nào đang chạy. Không có màn hình đăng nhập Microsoft giả.
+    </div>
+    <div>CloudCraft Play © 2025 — Demo giao diện, không phải sản phẩm chính thức của Mojang/Microsoft.</div>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+(function() {
+  'use strict';
+  const state = { status: 'disconnected', session: null, server: null, connectTimeout: null };
+  const $ = (id) => document.getElementById(id);
+  const headerDot = $('headerDot');
+  const headerStatusText = $('headerStatusText');
+  const screenBadge = $('screenBadge');
+  const placeholder = $('placeholder');
+  const connectingAnim = $('connectingAnim');
+  const btnPlay = $('btnPlay');
+  const btnStop = $('btnStop');
+  const btnFullscreen = $('btnFullscreen');
+  const stDot = $('stDot');
+  const stText = $('stText');
+  const stServer = $('stServer');
+  const stSession = $('stSession');
+  const sessionList = $('sessionList');
+  const toast = $('toast');
+
+  let toastTimer = null;
+  function showToast(msg, type) {
+    toast.textContent = msg;
+    toast.className = 'toast show' + (type ? ' ' + type : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.className = 'toast' + (type ? ' ' + type : ''); }, 3200);
+  }
+  function setDot(el, status) { el.className = 'dot ' + status; }
+  function statusLabel(status) {
+    return { disconnected: 'Chưa kết nối', connecting: 'Đang kết nối', connected: 'Đã kết nối' }[status] || 'Không rõ';
+  }
+  function render() {
+    setDot(headerDot, state.status);
+    headerStatusText.textContent = statusLabel(state.status);
+    setDot(stDot, state.status);
+    stText.textContent = statusLabel(state.status);
+    stServer.textContent = state.server || 'Không có';
+    stServer.style.color = state.server ? 'var(--green-glow)' : 'var(--text-dim)';
+    stSession.textContent = state.session ? state.session.name : 'Chưa chọn';
+    stSession.style.color = state.session ? 'var(--green-glow)' : 'var(--text-dim)';
+    const badgeMap = {
+      disconnected: { text: 'OFFLINE', color: 'var(--text-dim)' },
+      connecting: { text: 'CONNECTING...', color: 'var(--yellow)' },
+      connected: { text: 'ONLINE', color: 'var(--green-glow)' }
+    };
+    screenBadge.textContent = badgeMap[state.status].text;
+    screenBadge.style.color = badgeMap[state.status].color;
+    if (state.status === 'connecting') {
+      placeholder.style.display = 'none';
+      connectingAnim.classList.add('show');
+    } else if (state.status === 'connected') {
+      placeholder.style.display = 'none';
+      connectingAnim.classList.remove('show');
+    } else {
+      placeholder.style.display = 'block';
+      connectingAnim.classList.remove('show');
+    }
+    btnPlay.disabled = state.status !== 'disconnected';
+    btnStop.disabled = state.status === 'disconnected';
+    sessionList.querySelectorAll('.session-item').forEach(item => {
+      item.classList.toggle('selected', state.session && item.dataset.id === state.session.id);
+    });
+  }
+  function selectSession(id, name) {
+    if (state.status !== 'disconnected') { showToast('Không thể đổi phiên khi đang kết nối', 'warn'); return; }
+    state.session = { id, name };
+    render();
+    showToast('Đã chọn phiên: ' + name);
+  }
+  function startPlay() {
+    if (!state.session) { showToast('Vui lòng chọn phiên chơi trước!', 'warn'); return; }
+    state.status = 'connecting';
+    state.server = null;
+    render();
+    showToast('Đang thử kết nối tới máy chủ...');
+    clearTimeout(state.connectTimeout);
+    state.connectTimeout = setTimeout(() => {
+      state.status = 'disconnected';
+      state.server = null;
+      render();
+      showToast('❌ Chưa có máy chủ giả lập được kết nối. Không thể bắt đầu chơi.', 'error');
+    }, 2500);
+  }
+  function stopPlay() {
+    if (state.status === 'disconnected') return;
+    clearTimeout(state.connectTimeout);
+    state.status = 'disconnected';
+    state.server = null;
+    render();
+    showToast('Đã ngắt kết nối.');
+  }
+  function toggleFullscreen() {
+    const el = document.querySelector('.screen-panel');
+    if (!document.fullscreenElement) {
+      (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+    } else {
+      (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+    }
+  }
+  btnPlay.addEventListener('click', startPlay);
+  btnStop.addEventListener('click', stopPlay);
+  btnFullscreen.addEventListener('click', toggleFullscreen);
+  sessionList.querySelectorAll('.session-item').forEach(item => {
+    item.addEventListener('click', () => selectSession(item.dataset.id, item.dataset.name));
+  });
+  render();
+})();
+</script>
+</body>
+</html>
